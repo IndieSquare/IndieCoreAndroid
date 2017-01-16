@@ -6,12 +6,14 @@ import android.graphics.Color;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 import com.android.volley.AuthFailureError;
 import com.android.volley.NetworkResponse;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
+import com.android.volley.RetryPolicy;
 import com.android.volley.ServerError;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.HttpHeaderParser;
@@ -40,6 +42,7 @@ public class IndieCore {
         void didSignTransaction(String response);
         void didIssueToken(String response);
         void didGetAddress(String address);
+        void initialized();
 
     }
     private Listener ds;
@@ -80,7 +83,13 @@ public class IndieCore {
         webview.addJavascriptInterface(myJavaScriptInterface, "AndroidFunction");
 
 
+        webview.setWebViewClient(new WebViewClient() {
 
+            public void onPageFinished(WebView view, String url) {
+                ds.initialized();
+               loaded = true;
+            }
+        });
 
        // webview.addJavascriptInterface(new IndieCore.WebViewInterface(), "AndroidErrorReporter");
 
@@ -292,11 +301,16 @@ public class IndieCore {
     }
     private void createIssuanceTransaction(String source, String tokenName, Double quantity, boolean divisible, String description, int fee, int feePerKB){
 
-        final String URL = "https://api.indiesquare.me/v2/transactions/broadcast";
+
         // Post params to be sent to the server
         HashMap<String, String> params = new HashMap<String, String>();
         params.put("source", source);
-        params.put("quantity", quantity+"");
+        if(divisible == true){
+            params.put("quantity", quantity+"");
+        }else{
+            params.put("quantity", quantity.intValue()+"");
+        }
+
         params.put("token", tokenName);
         params.put("divisible", divisible+"");
         if(feePerKB != -1){
@@ -322,11 +336,6 @@ public class IndieCore {
             public void onErrorResponse(VolleyError error) {
                 //VolleyLog.e("Error: ", error.getMessage());
                 error.printStackTrace();
-                Log.d("abd", "Error: " + error
-                        + ">>" + error.networkResponse.statusCode
-                        + ">>" + error.networkResponse.data
-                        + ">>" + error.getCause()
-                        + ">>" + error.getMessage());
 
                 NetworkResponse response = error.networkResponse;
                 if (error instanceof ServerError && response != null) {
@@ -335,8 +344,8 @@ public class IndieCore {
                                 HttpHeaderParser.parseCharset(response.headers, "utf-8"));
                         // Now you can use any deserializer to make sense of data
 
-                        ds.didBroadcastTransaction(res);
-                        ds.didIssueToken(res);
+
+                        ds.didIssueToken("error"+res);
 
 
                     } catch (UnsupportedEncodingException e1) {
@@ -366,6 +375,23 @@ public class IndieCore {
             return headers;
         }};
 
+        req.setRetryPolicy(new RetryPolicy() {
+            @Override
+            public int getCurrentTimeout() {
+                return 50000;
+            }
+
+            @Override
+            public int getCurrentRetryCount() {
+                return 50000;
+            }
+
+            @Override
+            public void retry(VolleyError error) throws VolleyError {
+
+            }
+        });
+
         RequestQueue requestQueue = Volley.newRequestQueue(parent);
         requestQueue.add(req);
 
@@ -374,11 +400,11 @@ public class IndieCore {
     }
     private void createEnhancedAssetInfo(String token, String description, String websiteUrl, String imageUrl){
 
-        final String URL = "https://api.indiesquare.me/v2/transactions/broadcast";
+
         // Post params to be sent to the server
         HashMap<String, String> params = new HashMap<String, String>();
         params.put("description", description);
-        params.put("website", websiteUrl+"");
+        params.put("website", websiteUrl);
         params.put("image", imageUrl);
 
         JsonObjectRequest req = new JsonObjectRequest(Request.Method.POST,"https://api.indiesquare.me/v2/files/enhancedtokeninfo/"+token, new JSONObject(params),
@@ -396,11 +422,7 @@ public class IndieCore {
             public void onErrorResponse(VolleyError error) {
                 //VolleyLog.e("Error: ", error.getMessage());
                 error.printStackTrace();
-                Log.d("abd", "Error: " + error
-                        + ">>" + error.networkResponse.statusCode
-                        + ">>" + error.networkResponse.data
-                        + ">>" + error.getCause()
-                        + ">>" + error.getMessage());
+
 
                 NetworkResponse response = error.networkResponse;
                 if (error instanceof ServerError && response != null) {
@@ -410,7 +432,7 @@ public class IndieCore {
                         // Now you can use any deserializer to make sense of data
 
 
-                    Log.e("TAG","enha"+res);
+
                         ds.didIssueToken(res);
 
                     } catch (UnsupportedEncodingException e1) {
@@ -439,6 +461,23 @@ public class IndieCore {
             }
             return headers;
         }};
+
+        req.setRetryPolicy(new RetryPolicy() {
+            @Override
+            public int getCurrentTimeout() {
+                return 50000;
+            }
+
+            @Override
+            public int getCurrentRetryCount() {
+                return 50000;
+            }
+
+            @Override
+            public void retry(VolleyError error) throws VolleyError {
+
+            }
+        });
 
         RequestQueue requestQueue = Volley.newRequestQueue(parent);
         requestQueue.add(req);
@@ -461,11 +500,6 @@ public class IndieCore {
             public void onErrorResponse(VolleyError error) {
                 //VolleyLog.e("Error: ", error.getMessage());
                 error.printStackTrace();
-                Log.d("abd", "Error: " + error
-                        + ">>" + error.networkResponse.statusCode
-                        + ">>" + error.networkResponse.data
-                        + ">>" + error.getCause()
-                        + ">>" + error.getMessage());
 
                 NetworkResponse response = error.networkResponse;
                 if (error instanceof ServerError && response != null) {
@@ -474,7 +508,7 @@ public class IndieCore {
                                 HttpHeaderParser.parseCharset(response.headers, "utf-8"));
                         // Now you can use any deserializer to make sense of data
 
-                        Log.e("TAG","token"+res);
+
 
                         if(descriptionMaster == null && websiteURLMaster == null && imageURLMaster == null) {
                             createIssuanceTransaction(sourceMaster,tokenNameMaster,quantityMaster,divisibleMaster,descriptionMaster,feeMaster,feePerKBMaster);
@@ -510,6 +544,23 @@ public class IndieCore {
             return headers;
         }};
 
+        req.setRetryPolicy(new RetryPolicy() {
+            @Override
+            public int getCurrentTimeout() {
+                return 50000;
+            }
+
+            @Override
+            public int getCurrentRetryCount() {
+                return 50000;
+            }
+
+            @Override
+            public void retry(VolleyError error) throws VolleyError {
+
+            }
+        });
+
         RequestQueue requestQueue = Volley.newRequestQueue(parent);
         requestQueue.add(req);
 
@@ -524,7 +575,7 @@ public class IndieCore {
 
     }
 
-    public void signTransacation(String tx,String passphrase,int index, String destination){
+    public void signTransaction(String tx,String passphrase,int index, String destination){
         if(loaded == false){
             ds.didSignTransaction("error: IndieCore not initialized yet");
         }
@@ -536,7 +587,7 @@ public class IndieCore {
         }
     }
 
-    public void signTransacationNoDest(String tx,String passphrase,int index){
+    public void signTransactionNoDest(String tx,String passphrase,int index){
         if(loaded == false){
             ds.didSignTransaction("error: IndieCore not initialized yet");
         }
@@ -560,7 +611,7 @@ public class IndieCore {
         if(loaded == false){
             ds.didGetAddress("error: IndieCore not initialized yet");
         }
-        callJavaScript("createNewPassphrase");
+        callJavaScript("getAddressForPassphrase",passphrase,index+"");
     }
     public void generateRandomDetailedWallet(){
 
@@ -597,7 +648,7 @@ public class IndieCore {
         }
 
         stringBuilder.append(")}catch(error){AndroidFunction.onError(error.message);}");
-        Log.e("TAG","string:"+stringBuilder.toString());
+        //Log.e("TAG","string:"+stringBuilder.toString());
         webview.loadUrl(stringBuilder.toString());
     }
 

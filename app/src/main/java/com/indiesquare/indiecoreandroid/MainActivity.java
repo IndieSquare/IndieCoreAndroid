@@ -15,7 +15,7 @@ public class MainActivity extends AppCompatActivity implements IndieCore.Listene
 
 
         ic = new IndieCore(this,this);
-        ic.apiKey = "4d3dccf94abc3286cfa43b51d008ccb5";
+        ic.apiKey = "9dc6v7b6ba8262e153ca2df730d3c317";
 
 
     }
@@ -23,23 +23,24 @@ public class MainActivity extends AppCompatActivity implements IndieCore.Listene
 
 
     public void createPassphrase(View view) {
-
+        ic.createNewWallet();
         //ic.generateRandomDetailedWallet();
       //  ic.createNumericTokenName();
-        //ic.broadcastTransaction("0100000001bf1f87c5041063d8353f3d8e109fb11405456d7972c5f401308ced36eb9e8fea010000001976a914e1869fa1cec7741a502e7a5bd938ed8f5e354b5488acffffffff0200000000000000002e6a2c0b0b8cb664864cdf2ff70668595e63567b9d8ece36b2383513b6eeab7f1c15e70466593f13bb49618b8afe7079e93a00000000001976a914e1869fa1cec7741a502e7a5bd938ed8f5e354b5488ac00000000");
+        //ic.broadcastTransaction("01000000017d1e39debaf303e37c8e72f025af208c5b110434e61dfbaff33d9c1775229c0a020000006a473044022063366614a11db1d3c549e3894acec4e45a75c964a3d468a63227d64f1b9422b3022007b2670d39f8ea102011d552c74ad33303a08b84ae4b4bda098e135c5799203a012102eecbf9551f08fd1518408d7ea5a0234d834e97393cf549fb9089b3d53c1a0c26ffffffff0200000000000000004d6a4beca7155f5d64e252c4b4bfe35669f4778cdeecbd9ecd093e188472ebf4b646f7d75c537ca2eb43a360942e205406817f10a5887c7d8b88b4f24501847f38904ee823348240210178b0477b66d30b00000000001976a914edee861dff4de166683e4c54ae3869cd05c7ae0f88ac00000000");
 
 
-        String unsignedTx = "010000000414ae2264cdbe754b9ae4be18d84bfeb4f578af553b9b9e4f9cb2303d04ee9e45000000001976a91458b6e991b45487df810f4d96d5315da739637f1788acffffffffec15d27b74516fefd921cecbe043ea63124d28a3903aef8fb1682ccc926b1c62000000001976a91458b6e991b45487df810f4d96d5315da739637f1788acffffffff9878f76e1424c1d1eeb6b15d06902dd8f0c78f9bdb61263e4ca3ae68c571a292000000001976a91458b6e991b45487df810f4d96d5315da739637f1788acfffffffffdac7f1c83b01a8924a8965d356b804c2608bc261fc18041116ddb4a143bc499000000001976a91458b6e991b45487df810f4d96d5315da739637f1788acffffffff0336150000000000001976a9141485d9d03b41aaa9dca7d70d7f63ff4a0826100e88ac00000000000000001e6a1c246698efc5d81b78ceadf3179316b5eb6cc5c2c347c0b7b42121a94e92180000000000001976a91458b6e991b45487df810f4d96d5315da739637f1788ac00000000";
-       // signTransacation(String tx,String passphrase,int index, String destination){
+      //  String unsignedTx = "01000000017d1e39debaf303e37c8e72f025af208c5b110434e61dfbaff33d9c1775229c0a020000001976a914edee861dff4de166683e4c54ae3869cd05c7ae0f88acffffffff0200000000000000004d6a4beca7155f5d64e252c4b4bfe35669f4778cdeecbd9ecd093e188472ebf4b646f7d75c537ca2eb43a360942e205406817f10a5887c7d8b88b4f24501847f38904ee823348240210178b0477b66d30b00000000001976a914edee861dff4de166683e4c54ae3869cd05c7ae0f88ac00000000";
+       // signTransaction(String tx,String passphrase,int index, String destination){
 
-        //ic.signTransacation(unsignedTx,"rule dew anyway leap ash guitar realize crowd serve play perfectly horizon",1,"12sWrxRY7E7Nhmuyjbz4TtGE9jRewGqEZD");
+        //ic.signTransaction(unsignedTx,"rule dew anyway leap ash guitar realize crowd serve play perfectly horizon",1,"12sWrxRY7E7Nhmuyjbz4TtGE9jRewGqEZD");
 
-      //  ic.signTransacationNoDest(unsignedTx,"rule dew anyway leap ash guitar realize crowd serve play perfectly horizon",1);
+       //ic.signTransactionNoDest(unsignedTx,"rule dew anyway leap ash guitar realize crowd serve play perfectly horizon",0);
        // ic.checkIfTokenExists("SARUTOBIsadfwefdads");
 
-       // ic.issueToken("1Nh4tPtQjHZSoYdToTF7T3xbaKrTNKM3wP","KINK",1000000.0,false,"Kink token","http://www.mandelduck.com","http://is2.mzstatic.com/image/thumb/Purple3/v4/aa/ea/99/aaea9968-7bc0-9977-9251-68ab0bb08336/source/1200x630bf.jpg",10000);
+    //    ic.issueToken("1Nh4tPtQjHZSoYdToTF7T3xbaKrTNKM3wP","STBKINK",1000000.0,false,"Kink token","http://www.mandelduck.com","http://is2.mzstatic.com/image/thumb/Purple3/v4/aa/ea/99/aaea9968-7bc0-9977-9251-68ab0bb08336/source/1200x630bf.jpg",10000);
 
-        ic.getAddressForPassphrase("rule dew anyway leap ash guitar realize crowd serve play perfectly horizon",0);
+       // ic.getAddressForPassphrase("rule dew anyway leap ash guitar realize crowd serve play perfectly horizon",0);
+
 
     }
 
