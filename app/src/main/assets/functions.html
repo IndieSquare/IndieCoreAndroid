@@ -1,0 +1,261 @@
+
+<script src="bitcore.js"></script>
+<script src="mnemonic.js"></script>
+<script>
+
+var basePath = 'm/0\'/0/';
+var account = null;
+ var bitcore = require('bitcore');
+
+
+
+
+function init(passphrase, derive, nokeep){
+
+    if( passphrase == null ){
+
+      document.location.href = "http://www.indiecorelocal.com/params?init=error";
+
+      return;
+    }
+
+
+
+   var words = passphrase.split(' ');
+
+   try {
+        var seed = new Mnemonic(words).toHex();
+   }
+   catch(err) {
+       document.location.href = "http://www.indiecorelocal.com/params?init="+err;
+
+       return;
+   }
+
+
+
+    var master = bitcore.HDPrivateKey.fromSeed(seed);
+
+    var d = basePath + '0';
+    if( derive != null ) d = derive;
+
+    var masterderive = master.derive( d );
+    if( !nokeep ) account = masterderive;
+
+
+    document.location.href = "http://www.indiecorelocal.com/params?init="+masterderive;
+
+
+};
+function getKeyForPassphrase(passphrase,d){
+
+    var words = passphrase.split(' ');
+
+    try {
+        var seed = new Mnemonic(words).toHex();
+    }
+    catch(err) {
+
+
+         throw  err;
+    }
+
+
+    var master = bitcore.HDPrivateKey.fromSeed(seed);
+
+    var route = basePath + d;
+
+    var masterderive = master.derive( route );
+
+    return masterderive;
+
+}
+function isValidBitcoinAddress(address){
+
+        if( bitcore.Address.isValid(address, 'livenet') ){
+           AndroidFunction.addressChecked("true");
+            return;
+
+        }
+        else{
+            AndroidFunction.addressChecked("false");
+            return;
+        }
+
+}
+function getAddressForPassphrase(passphrase,d){
+
+     try {
+
+        var masterderive = getKeyForPassphrase(passphrase,d);
+
+
+        var priv = bitcore.PrivateKey(masterderive.privateKey);
+        AndroidFunction.getAddressForPassphrase(priv.toAddress().toString());
+
+
+
+     }
+     catch(err) {
+
+
+         AndroidFunction.getAddressForPassphrase("error"+err);
+         return;
+     }
+
+
+
+
+}
+function createRandomDetailedWallet(){
+
+
+    var privateKey = new bitcore.PrivateKey();
+    var wif = privateKey.toWIF();
+
+    var address = privateKey.toAddress();
+    var publicKey = privateKey.toPublicKey();
+       AndroidFunction.detailedWalletCreated(privateKey.toString(),wif,address.toString(),publicKey.toString());
+
+    return;
+
+
+}
+function createNewPassphrase() {
+
+  var words = null;
+  try {
+      var m = new Mnemonic(words);
+       AndroidFunction.passphraseCreated(m.toWords().toString().replace(/,/gi, ' '));
+
+  }
+  catch(err) {
+       AndroidFunction.passphraseCreated("error:"+err);
+
+      return;
+  }
+
+
+}
+
+function signTransaction(passphrase,d,raw_tx,destination,apiKey) {
+
+    try {
+        var params = {};
+        var masterderive = getKeyForPassphrase(passphrase,d);
+
+        params.pubkey = masterderive.publicKey;
+
+        params.destination = destination;
+
+        var privkey = bitcore.PrivateKey(masterderive.privateKey);
+
+        params.address = privkey.toAddress().toString();
+        params.callback = function(signed_tx){
+               AndroidFunction.didSignTransaction(signed_tx);
+
+        };
+        params.onError = function(error){
+           AndroidFunction.didSignTransaction("error:"+error);
+
+        };
+        params.fail = function(error){
+            AndroidFunction.didSignTransaction("error:"+error);
+
+        };
+         try {
+
+            var result = bitcore.signrawtransaction(raw_tx, privkey, params,apiKey);
+
+
+         }
+         catch(err) {
+
+              AndroidFunction.didSignTransaction("error:"+err);
+              return;
+         }
+
+
+    }
+    catch(err) {
+
+
+        AndroidFunction.didSignTransaction("error:"+err);
+        return;
+    }
+
+
+}
+function randomIntFromInterval(min,max)
+{
+    return Math.floor(Math.random()*(max-min+1)+min);
+}
+function createNumericTokenName(){
+
+
+    var min = 95428956661682180;
+
+    var max =  18446744073709552000;
+
+    var rand = randomIntFromInterval(min,max);
+    var numeric_name = "A" + rand;
+    AndroidFunction.didCreateNumericTokenName(numeric_name);
+    return;
+}
+function signTransactionNoDest(passphrase,d,raw_tx,apiKey) {
+
+    try {
+        var params = {};
+
+        var masterderive = getKeyForPassphrase(passphrase,d);
+
+        params.pubkey = masterderive.publicKey;
+
+        var privkey = bitcore.PrivateKey(masterderive.privateKey);
+
+        params.address = privkey.toAddress().toString();
+        params.callback = function(signed_tx){
+
+           AndroidFunction.didSignTransaction(signed_tx);
+
+        };
+        params.onError = function(error){
+           AndroidFunction.didSignTransaction("error:"+error);
+
+        };
+        params.fail = function(error){
+          AndroidFunction.didSignTransaction("error:"+error);
+
+        };
+        try {
+
+            var result = bitcore.signrawtransaction(raw_tx, privkey, params,apiKey);
+
+
+        }
+        catch(err) {
+
+            AndroidFunction.didSignTransaction("error:"+err);
+
+            return;
+        }
+        
+
+    }
+    catch(err) {
+
+
+         AndroidFunction.didSignTransaction("error:"+err);
+        return;
+    }
+
+
+}
+function loaded(){
+  AndroidFunction.loaded();
+}
+loaded();
+</script>
+<html>loaded</html>
+
+
