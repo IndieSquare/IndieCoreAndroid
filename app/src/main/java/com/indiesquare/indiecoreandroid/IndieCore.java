@@ -41,6 +41,9 @@ public class IndieCore {
         void didBroadcastTransaction(String response);
         void didSignTransaction(String response);
         void didIssueToken(String response);
+        void didCreateSendTransaction(String response);
+        void didCreateOrderTransaction(String response);
+        void didCreateCancelTransaction(String response);
         void didGetAddress(String address);
         void initialized();
 
@@ -178,6 +181,334 @@ public class IndieCore {
 
     }
 
+
+
+    public void createCancelTransaction(String source, String offerHash, int fee, int feePerKB) {
+
+        createCancelTransactionMaster(source,offerHash,fee,feePerKB);
+
+    }
+
+    public void createCancelTransaction(String source, String offerHash) {
+
+         createCancelTransactionMaster(source,offerHash,-1,-1);
+
+    }
+
+    private void createCancelTransactionMaster(String source, String offerHash, int fee, int feePerKB){
+
+
+        // Post params to be sent to the server
+        HashMap<String, String> params = new HashMap<String, String>();
+        params.put("source", source);
+
+        params.put("offer_hash", offerHash);
+
+
+        if(feePerKB != -1){
+            params.put("fee_per_kb",feePerKB+"");
+        }
+        if(fee != -1){
+            params.put("fee",fee+"");
+        }
+
+
+
+
+        JsonObjectRequest req = new JsonObjectRequest(Request.Method.POST,"https://api.indiesquare.me/v2/transactions/cancel", new JSONObject(params),
+                new Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+
+                        ds.didCreateCancelTransaction(response.toString());
+
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                //VolleyLog.e("Error: ", error.getMessage());
+                error.printStackTrace();
+
+                NetworkResponse response = error.networkResponse;
+                if (error instanceof ServerError && response != null) {
+                    try {
+                        String res = new String(response.data,
+                                HttpHeaderParser.parseCharset(response.headers, "utf-8"));
+                        // Now you can use any deserializer to make sense of data
+
+
+                        ds.didCreateCancelTransaction("error"+res);
+
+
+                    } catch (UnsupportedEncodingException e1) {
+                        // Couldn't properly decode data to string
+                        e1.printStackTrace();
+                        ds.didCreateCancelTransaction("error");
+                    }
+                }else{
+                    ds.didCreateCancelTransaction("error");
+                }
+
+
+            }
+
+        }
+
+
+
+        ){ @Override
+
+        public Map<String, String> getHeaders() throws AuthFailureError {
+            HashMap<String, String> headers = new HashMap<String, String>();
+            headers.put("Content-Type", "application/json; charset=utf-8");
+            if(apiKey != null){
+                headers.put("X-Api-Key",apiKey);
+            }
+            return headers;
+        }};
+
+        req.setRetryPolicy(new RetryPolicy() {
+            @Override
+            public int getCurrentTimeout() {
+                return 50000;
+            }
+
+            @Override
+            public int getCurrentRetryCount() {
+                return 50000;
+            }
+
+            @Override
+            public void retry(VolleyError error) throws VolleyError {
+
+            }
+        });
+
+        RequestQueue requestQueue = Volley.newRequestQueue(parent);
+        requestQueue.add(req);
+
+
+
+    }
+
+    public void createOrderTransaction(String source, String getToken, Double getQuantity, String giveToken, Double giveQuantity, int expiration, int fee, int feePerKB) {
+            createOrderTransactionMaster(source,getToken,getQuantity,giveToken,giveQuantity,expiration,fee,feePerKB);
+    }
+
+    public void createOrderTransaction(String source, String getToken, Double getQuantity, String giveToken, Double giveQuantity, int expiration) {
+        createOrderTransactionMaster(source,getToken,getQuantity,giveToken,giveQuantity,expiration,-1,-1);
+    }
+
+        private void createOrderTransactionMaster(String source, String getToken, Double getQuantity, String giveToken, Double giveQuantity, int expiration, int fee, int feePerKB){
+
+
+        // Post params to be sent to the server
+        HashMap<String, String> params = new HashMap<String, String>();
+        params.put("source", source);
+
+        params.put("give_quantity", giveQuantity+"");
+        params.put("get_quantity", getQuantity+"");
+
+        params.put("give_token", giveToken);
+        params.put("get_token", getToken);
+
+        if(feePerKB != -1){
+            params.put("fee_per_kb",feePerKB+"");
+        }
+        if(fee != -1){
+            params.put("fee",fee+"");
+        }
+
+
+
+
+        JsonObjectRequest req = new JsonObjectRequest(Request.Method.POST,"https://api.indiesquare.me/v2/transactions/order", new JSONObject(params),
+                new Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+
+                        ds.didCreateSendTransaction(response.toString());
+
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                //VolleyLog.e("Error: ", error.getMessage());
+                error.printStackTrace();
+
+                NetworkResponse response = error.networkResponse;
+                if (error instanceof ServerError && response != null) {
+                    try {
+                        String res = new String(response.data,
+                                HttpHeaderParser.parseCharset(response.headers, "utf-8"));
+                        // Now you can use any deserializer to make sense of data
+
+
+                        ds.didCreateOrderTransaction("error"+res);
+
+
+                    } catch (UnsupportedEncodingException e1) {
+                        // Couldn't properly decode data to string
+                        e1.printStackTrace();
+                        ds.didCreateOrderTransaction("error");
+                    }
+                }else{
+                    ds.didCreateOrderTransaction("error");
+                }
+
+
+            }
+
+        }
+
+
+
+        ){ @Override
+
+        public Map<String, String> getHeaders() throws AuthFailureError {
+            HashMap<String, String> headers = new HashMap<String, String>();
+            headers.put("Content-Type", "application/json; charset=utf-8");
+            if(apiKey != null){
+                headers.put("X-Api-Key",apiKey);
+            }
+            return headers;
+        }};
+
+        req.setRetryPolicy(new RetryPolicy() {
+            @Override
+            public int getCurrentTimeout() {
+                return 50000;
+            }
+
+            @Override
+            public int getCurrentRetryCount() {
+                return 50000;
+            }
+
+            @Override
+            public void retry(VolleyError error) throws VolleyError {
+
+            }
+        });
+
+        RequestQueue requestQueue = Volley.newRequestQueue(parent);
+        requestQueue.add(req);
+
+
+
+    }
+
+        public void createSendTransaction(String source, String tokenName, Double quantity, String destination, int fee, int feePerKB) {
+
+            createSendTransactionMaster(source,tokenName,quantity,destination,fee,feePerKB);
+
+        }
+
+        public void createSendTransaction(String source, String tokenName, Double quantity, String destination) {
+
+            createSendTransactionMaster(source,tokenName,quantity,destination,-1,-1);
+
+        }
+
+
+
+        private void createSendTransactionMaster(String source, String tokenName, Double quantity, String destination, int fee, int feePerKB){
+
+
+        // Post params to be sent to the server
+        HashMap<String, String> params = new HashMap<String, String>();
+        params.put("source", source);
+
+            params.put("quantity", quantity+"");
+
+
+        params.put("token", tokenName);
+        params.put("destination", destination);
+        if(feePerKB != -1){
+            params.put("fee_per_kb",feePerKB+"");
+        }
+        if(fee != -1){
+            params.put("fee",fee+"");
+        }
+
+
+
+
+        JsonObjectRequest req = new JsonObjectRequest(Request.Method.POST,"https://api.indiesquare.me/v2/transactions/send", new JSONObject(params),
+                new Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+
+                        ds.didCreateSendTransaction(response.toString());
+
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                //VolleyLog.e("Error: ", error.getMessage());
+                error.printStackTrace();
+
+                NetworkResponse response = error.networkResponse;
+                if (error instanceof ServerError && response != null) {
+                    try {
+                        String res = new String(response.data,
+                                HttpHeaderParser.parseCharset(response.headers, "utf-8"));
+                        // Now you can use any deserializer to make sense of data
+
+
+                        ds.didCreateSendTransaction("error"+res);
+
+
+                    } catch (UnsupportedEncodingException e1) {
+                        // Couldn't properly decode data to string
+                        e1.printStackTrace();
+                        ds.didCreateSendTransaction("error");
+                    }
+                }else{
+                    ds.didCreateSendTransaction("error");
+                }
+
+
+            }
+
+        }
+
+
+
+        ){ @Override
+
+        public Map<String, String> getHeaders() throws AuthFailureError {
+            HashMap<String, String> headers = new HashMap<String, String>();
+            headers.put("Content-Type", "application/json; charset=utf-8");
+            if(apiKey != null){
+                headers.put("X-Api-Key",apiKey);
+            }
+            return headers;
+        }};
+
+        req.setRetryPolicy(new RetryPolicy() {
+            @Override
+            public int getCurrentTimeout() {
+                return 50000;
+            }
+
+            @Override
+            public int getCurrentRetryCount() {
+                return 50000;
+            }
+
+            @Override
+            public void retry(VolleyError error) throws VolleyError {
+
+            }
+        });
+
+        RequestQueue requestQueue = Volley.newRequestQueue(parent);
+        requestQueue.add(req);
+
+
+
+    }
 
     public void issueToken(String source, String tokenName, Double quantity, boolean divisible){
         if(loaded == false){
