@@ -44189,7 +44189,7 @@ Message.prototype.inspect = function() {
 };
 
 	bitcore.verifyMessage = function(message,signature,address){
-		
+
 		return Message(message).verify(address, signature);
 		
 	};
@@ -44201,9 +44201,9 @@ Message.prototype.inspect = function() {
 		return signature;
 	
 	};
-	bitcore.signrawtransaction = function(raw_tx, privkey, params, api_key){
- 
- 
+	bitcore.signrawtransaction = function(raw_tx, privkey, params, api_key,base_url){
+
+
  function onerror(params, e, error){
  var message = { type: 'Error', message: 'error' };
  if( error != undefined && error != null ){
@@ -44215,20 +44215,20 @@ Message.prototype.inspect = function() {
  if( params.onError ) params.onError( message );
 	};
     function connectPOSTv2(params){
- 
+
         var http = new XMLHttpRequest();
-        var url = 'https://api.indiesquare.me/v2/' + params.method;
+        var url =  base_url + params.method;
 
         http.open("POST", url, true);
- 
+
         //Send the proper header information along with the request
         http.setRequestHeader("Content-type", "application/json");
        // http.setRequestHeader("charset", "utf-8");
         http.setRequestHeader("X-Api-Key", params.api_key);
- 
+
         http.onreadystatechange = function() {//Call a function when the state changes.
           if(http.readyState == 4) {
- 
+
  if(http.status == 200){
            // alert(http.responseText);
                 var results = '';
@@ -44238,7 +44238,7 @@ Message.prototype.inspect = function() {
                 catch(e){}
                     params.callback( results );
                 if( params.always != null ) params.always();
- 
+
  }
  else{
  onerror(params, e, http.responseText);
@@ -44284,7 +44284,7 @@ Message.prototype.inspect = function() {
 						var vout = decoded_tx.vout[i];
 						var type = vout.scriptPubKey.type;
 						
-						if( type === 'pubkeyhash' ){
+						if( type === 'pubkeyhash' && ischeck_destination ){
 							var address = vout.scriptPubKey.addresses[0];
 							if( ischeck_address != null && address !== params.address ){
 								if( ischeck_destination != null ){

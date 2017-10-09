@@ -3,8 +3,8 @@ package com.indiesquare.indiecoreandroid;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Color;
-import android.util.Log;
 import android.webkit.JavascriptInterface;
+import android.webkit.URLUtil;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
@@ -16,10 +16,13 @@ import com.android.volley.Response;
 import com.android.volley.RetryPolicy;
 import com.android.volley.ServerError;
 import com.android.volley.VolleyError;
+import com.android.volley.VolleyLog;
 import com.android.volley.toolbox.HttpHeaderParser;
+import com.android.volley.toolbox.JsonArrayRequest;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -27,34 +30,37 @@ import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Created by a on 16/01/2017.
- */
 
 public class IndieCore {
-    public interface Listener {
 
-        void didCreateWallet(String passphrase);
-        void didCheckAddress(Boolean result);
-        void didCreateNumericTokenName(String name);
-        void didCreateDetailedWallet(String privateKey, String wif, String address, String publicKey);
-        void didBroadcastTransaction(String response);
-        void didSignTransaction(String response);
-        void didIssueToken(String response);
-        void didCreateSendTransaction(String response);
-        void didCreateOrderTransaction(String response);
-        void didCreateCancelTransaction(String response);
-        void didGetAddress(String address);
-        void initialized();
 
+    //define callback interface
+    public interface CallbackArray {
+
+        void onFinished(IndieCoreError error, JSONArray result);
     }
-    private Listener ds;
+
+    private CallbackArray cba;
+
+    public interface CallbackObject {
+
+        void onFinished(IndieCoreError error, JSONObject result);
+    }
+
+    private CallbackObject cbo;
+
+    private IndieCore ic;
+
+
     WebView webview;
     Activity parent;
     public String apiKey;
 
+    String baseUrl = "https://api.indiesquare.me/v2/";
 
 
+    CallbackObject currentCallbackObject;
+    CallbackArray currentCallbackArray;
     String sourceMaster;
     String tokenNameMaster;
     Double quantityMaster;
@@ -66,20 +72,22 @@ public class IndieCore {
     int feePerKBMaster;
     boolean loaded;
 
-    private class WebViewInterface{
+    private class WebViewInterface {
 
         @JavascriptInterface
-        public void onError(String error){
+        public void onError(String error) {
             throw new Error(error);
         }
     }
 
-    public IndieCore(Activity activity,Listener datasource) {
-        ds = datasource;
+    public IndieCore(Activity activity,String key,boolean testnet, final CallbackObject callback) {
 
+    if(testnet){
+        baseUrl = "https://apitestnet.indiesquare.me/v2/";
+    }
+        apiKey = key;
         parent = activity;
         webview = new WebView(activity);
-        //webview.setVisibility(View.INVISIBLE);
         webview.getSettings().setJavaScriptEnabled(true);
         final IndieCore.IndieCoreInterface myJavaScriptInterface
                 = new IndieCore.IndieCoreInterface(activity);
@@ -89,113 +97,75 @@ public class IndieCore {
         webview.setWebViewClient(new WebViewClient() {
 
             public void onPageFinished(WebView view, String url) {
-                ds.initialized();
-               loaded = true;
+                loaded = true;
+                JSONObject res = new JSONObject();
+                try {
+                    res.put("initialized","true");
+
+                } catch (JSONException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+
+                callback.onFinished(null,res);
+
+
             }
         });
-
-       // webview.addJavascriptInterface(new IndieCore.WebViewInterface(), "AndroidErrorReporter");
-
 
         webview.loadUrl("file:///android_asset/functions.html");
         webview.setBackgroundColor(Color.TRANSPARENT);
 
 
-
     }
 
 
-    public void broadcastTransaction(final String signedTx){
+    public void broadcast(final String signedTx, final CallbackObject callback) {
 
-
-        final String URL = "https://api.indiesquare.me/v2/transactions/broadcast";
-        // Post params to be sent to the server
         HashMap<String, String> params = new HashMap<String, String>();
-        params.put("tx", signedTx);
+        params.put("tx",signedTx);
 
-        JsonObjectRequest req = new JsonObjectRequest(Request.Method.POST,URL, new JSONObject(params),
-                new Response.Listener<JSONObject>() {
-                    @Override
-                    public void onResponse(JSONObject response) {
+        final String URL = baseUrl + "transactions/broadcast";
 
-                            ds.didBroadcastTransaction(response.toString());
+        postRequest(URL,params, new CallbackObject(){
 
-                    }
-                }, new Response.ErrorListener() {
-            @Override
-            public void onErrorResponse(VolleyError error) {
-                //VolleyLog.e("Error: ", error.getMessage());
-                error.printStackTrace();
-                Log.d("abd", "Error: " + error
-                        + ">>" + error.networkResponse.statusCode
-                        + ">>" + error.networkResponse.data
-                        + ">>" + error.getCause()
-                        + ">>" + error.getMessage());
+            public void onFinished(IndieCoreError error, JSONObject result) {
 
-                NetworkResponse response = error.networkResponse;
-                if (error instanceof ServerError && response != null) {
-                    try {
-                        String res = new String(response.data,
-                                HttpHeaderParser.parseCharset(response.headers, "utf-8"));
-                        // Now you can use any deserializer to make sense of data
-
-                        ds.didBroadcastTransaction(res);
-                        JSONObject obj = new JSONObject(res);
+                callback.onFinished(error,result);
+            }
+        });
 
 
-                    } catch (UnsupportedEncodingException e1) {
-                        // Couldn't properly decode data to string
-                        e1.printStackTrace();
-                    } catch (JSONException e2) {
-                        // returned data is not JSONObject?
-                        e2.printStackTrace();
-                    }
-                }else{
-                    ds.didBroadcastTransaction("error");
-                }
+    }
 
 
+    public void createCancel(String source, String offerHash, int fee, int feePerKB,final CallbackObject callback ) {
+
+        createCancelMaster(source, offerHash, fee, feePerKB, new CallbackObject(){
+
+            public void onFinished(IndieCoreError error, JSONObject result) {
+
+                callback.onFinished(error,result);
             }
 
-        }
+        });
 
+    }
 
+    public void createCancel(String source, String offerHash,final CallbackObject callback ) {
 
-        ){ @Override
+        createCancelMaster(source, offerHash, -1, -1, new CallbackObject(){
 
-        public Map<String, String> getHeaders() throws AuthFailureError {
-            HashMap<String, String> headers = new HashMap<String, String>();
-            headers.put("Content-Type", "application/json; charset=utf-8");
-            if(apiKey != null){
-                headers.put("X-Api-Key",apiKey);
+            public void onFinished(IndieCoreError error, JSONObject result) {
+
+                callback.onFinished(error,result);
             }
-            return headers;
-        }};
 
-        RequestQueue requestQueue = Volley.newRequestQueue(parent);
-        requestQueue.add(req);
-
-
-
-
+        });
 
     }
 
-
-
-    public void createCancelTransaction(String source, String offerHash, int fee, int feePerKB) {
-
-        createCancelTransactionMaster(source,offerHash,fee,feePerKB);
-
-    }
-
-    public void createCancelTransaction(String source, String offerHash) {
-
-         createCancelTransactionMaster(source,offerHash,-1,-1);
-
-    }
-
-    private void createCancelTransactionMaster(String source, String offerHash, int fee, int feePerKB){
+    private void createCancelMaster(String source, String offerHash, int fee, int feePerKB, final CallbackObject callback) {
 
 
         // Post params to be sent to the server
@@ -205,760 +175,744 @@ public class IndieCore {
         params.put("offer_hash", offerHash);
 
 
-        if(feePerKB != -1){
-            params.put("fee_per_kb",feePerKB+"");
+        if (feePerKB != -1) {
+            params.put("fee_per_kb", feePerKB + "");
         }
-        if(fee != -1){
-            params.put("fee",fee+"");
-        }
-
-
-
-
-        JsonObjectRequest req = new JsonObjectRequest(Request.Method.POST,"https://api.indiesquare.me/v2/transactions/cancel", new JSONObject(params),
-                new Response.Listener<JSONObject>() {
-                    @Override
-                    public void onResponse(JSONObject response) {
-
-                        ds.didCreateCancelTransaction(response.toString());
-
-                    }
-                }, new Response.ErrorListener() {
-            @Override
-            public void onErrorResponse(VolleyError error) {
-                //VolleyLog.e("Error: ", error.getMessage());
-                error.printStackTrace();
-
-                NetworkResponse response = error.networkResponse;
-                if (error instanceof ServerError && response != null) {
-                    try {
-                        String res = new String(response.data,
-                                HttpHeaderParser.parseCharset(response.headers, "utf-8"));
-                        // Now you can use any deserializer to make sense of data
-
-
-                        ds.didCreateCancelTransaction("error"+res);
-
-
-                    } catch (UnsupportedEncodingException e1) {
-                        // Couldn't properly decode data to string
-                        e1.printStackTrace();
-                        ds.didCreateCancelTransaction("error");
-                    }
-                }else{
-                    ds.didCreateCancelTransaction("error");
-                }
-
-
-            }
-
+        if (fee != -1) {
+            params.put("fee", fee + "");
         }
 
+        final String URL = baseUrl + "transactions/cancel";
 
+        postRequest(URL,params, new CallbackObject(){
 
-        ){ @Override
+            public void onFinished(IndieCoreError error, JSONObject result) {
 
-        public Map<String, String> getHeaders() throws AuthFailureError {
-            HashMap<String, String> headers = new HashMap<String, String>();
-            headers.put("Content-Type", "application/json; charset=utf-8");
-            if(apiKey != null){
-                headers.put("X-Api-Key",apiKey);
-            }
-            return headers;
-        }};
-
-        req.setRetryPolicy(new RetryPolicy() {
-            @Override
-            public int getCurrentTimeout() {
-                return 50000;
-            }
-
-            @Override
-            public int getCurrentRetryCount() {
-                return 50000;
-            }
-
-            @Override
-            public void retry(VolleyError error) throws VolleyError {
-
+                callback.onFinished(error,result);
             }
         });
 
-        RequestQueue requestQueue = Volley.newRequestQueue(parent);
-        requestQueue.add(req);
 
 
 
     }
 
-    public void createOrderTransaction(String source, String getToken, Double getQuantity, String giveToken, Double giveQuantity, int expiration, int fee, int feePerKB) {
-            createOrderTransactionMaster(source,getToken,getQuantity,giveToken,giveQuantity,expiration,fee,feePerKB);
+    public void createOrder(String source, String getToken, Double getQuantity, String giveToken, Double giveQuantity, int expiration, int fee, int feePerKB,final CallbackObject callback ) {
+        createOrderMaster(source, getToken, getQuantity, giveToken, giveQuantity, expiration, fee, feePerKB,new CallbackObject(){
+
+            public void onFinished(IndieCoreError error, JSONObject result) {
+
+                callback.onFinished(error,result);
+            }
+
+        });
     }
 
-    public void createOrderTransaction(String source, String getToken, Double getQuantity, String giveToken, Double giveQuantity, int expiration) {
-        createOrderTransactionMaster(source,getToken,getQuantity,giveToken,giveQuantity,expiration,-1,-1);
+    public void createOrder(String source, String getToken, Double getQuantity, String giveToken, Double giveQuantity, int expiration,final CallbackObject callback ) {
+        createOrderMaster(source, getToken, getQuantity, giveToken, giveQuantity, expiration, -1, -1,new CallbackObject(){
+
+            public void onFinished(IndieCoreError error, JSONObject result) {
+
+                callback.onFinished(error,result);
+            }
+
+        });
     }
 
-        private void createOrderTransactionMaster(String source, String getToken, Double getQuantity, String giveToken, Double giveQuantity, int expiration, int fee, int feePerKB){
+    private void createOrderMaster(String source, String getToken, Double getQuantity, String giveToken, Double giveQuantity, int expiration, int fee, int feePerKB, final CallbackObject callback) {
 
 
         // Post params to be sent to the server
         HashMap<String, String> params = new HashMap<String, String>();
         params.put("source", source);
 
-        params.put("give_quantity", giveQuantity+"");
-        params.put("get_quantity", getQuantity+"");
 
+
+        if ((giveQuantity == Math.floor(giveQuantity)) && !Double.isInfinite(giveQuantity)) {
+            params.put("give_quantity", giveQuantity.intValue()+ "");
+
+        }else{
+            params.put("give_quantity", giveQuantity + "");
+        }
+
+        if ((getQuantity == Math.floor(getQuantity)) && !Double.isInfinite(getQuantity)) {
+            params.put("get_quantity", getQuantity.intValue()+ "");
+
+        }else{
+            params.put("get_quantity", getQuantity + "");
+        }
+
+
+        params.put("expiration", expiration+ "");
         params.put("give_token", giveToken);
         params.put("get_token", getToken);
 
-        if(feePerKB != -1){
-            params.put("fee_per_kb",feePerKB+"");
+        if (feePerKB != -1) {
+            params.put("fee_per_kb", feePerKB + "");
         }
-        if(fee != -1){
-            params.put("fee",fee+"");
-        }
-
-
-
-
-        JsonObjectRequest req = new JsonObjectRequest(Request.Method.POST,"https://api.indiesquare.me/v2/transactions/order", new JSONObject(params),
-                new Response.Listener<JSONObject>() {
-                    @Override
-                    public void onResponse(JSONObject response) {
-
-                        ds.didCreateSendTransaction(response.toString());
-
-                    }
-                }, new Response.ErrorListener() {
-            @Override
-            public void onErrorResponse(VolleyError error) {
-                //VolleyLog.e("Error: ", error.getMessage());
-                error.printStackTrace();
-
-                NetworkResponse response = error.networkResponse;
-                if (error instanceof ServerError && response != null) {
-                    try {
-                        String res = new String(response.data,
-                                HttpHeaderParser.parseCharset(response.headers, "utf-8"));
-                        // Now you can use any deserializer to make sense of data
-
-
-                        ds.didCreateOrderTransaction("error"+res);
-
-
-                    } catch (UnsupportedEncodingException e1) {
-                        // Couldn't properly decode data to string
-                        e1.printStackTrace();
-                        ds.didCreateOrderTransaction("error");
-                    }
-                }else{
-                    ds.didCreateOrderTransaction("error");
-                }
-
-
-            }
-
+        if (fee != -1) {
+            params.put("fee", fee + "");
         }
 
 
+        final String URL =  baseUrl + "transactions/order";
 
-        ){ @Override
+        postRequest(URL,params, new CallbackObject(){
 
-        public Map<String, String> getHeaders() throws AuthFailureError {
-            HashMap<String, String> headers = new HashMap<String, String>();
-            headers.put("Content-Type", "application/json; charset=utf-8");
-            if(apiKey != null){
-                headers.put("X-Api-Key",apiKey);
-            }
-            return headers;
-        }};
+            public void onFinished(IndieCoreError error, JSONObject result) {
 
-        req.setRetryPolicy(new RetryPolicy() {
-            @Override
-            public int getCurrentTimeout() {
-                return 50000;
-            }
-
-            @Override
-            public int getCurrentRetryCount() {
-                return 50000;
-            }
-
-            @Override
-            public void retry(VolleyError error) throws VolleyError {
-
+                callback.onFinished(error,result);
             }
         });
 
-        RequestQueue requestQueue = Volley.newRequestQueue(parent);
-        requestQueue.add(req);
 
 
 
     }
 
-        public void createSendTransaction(String source, String tokenName, Double quantity, String destination, int fee, int feePerKB) {
+    public void createSend(String source, String tokenName, Double quantity, String destination, int fee, int feePerKB, final CallbackObject callback) {
 
-            createSendTransactionMaster(source,tokenName,quantity,destination,fee,feePerKB);
+        createSendMaster(source, tokenName, quantity, destination, fee, feePerKB,new CallbackObject(){
 
-        }
+            public void onFinished(IndieCoreError error, JSONObject result) {
 
-        public void createSendTransaction(String source, String tokenName, Double quantity, String destination) {
+                callback.onFinished(error,result);
+            }
 
-            createSendTransactionMaster(source,tokenName,quantity,destination,-1,-1);
+        });
 
-        }
+    }
+
+    public void createSend(String source, String tokenName, Double quantity, String destination, final CallbackObject callback) {
+
+        createSendMaster(source, tokenName, quantity, destination, -1, -1,new CallbackObject(){
+
+            public void onFinished(IndieCoreError error, JSONObject result) {
+
+                callback.onFinished(error,result);
+            }
+
+        });
+
+    }
 
 
+    private void createSendMaster(String source, String tokenName, Double quantity, String destination, int fee, int feePerKB, final CallbackObject callback) {
 
-        private void createSendTransactionMaster(String source, String tokenName, Double quantity, String destination, int fee, int feePerKB){
 
 
         // Post params to be sent to the server
         HashMap<String, String> params = new HashMap<String, String>();
         params.put("source", source);
+        if ((quantity == Math.floor(quantity)) && !Double.isInfinite(quantity)) {
+            params.put("quantity", quantity.intValue()+ "");
 
-            params.put("quantity", quantity+"");
+        }else{
+            params.put("quantity", quantity + "");
+        }
+
 
 
         params.put("token", tokenName);
         params.put("destination", destination);
-        if(feePerKB != -1){
-            params.put("fee_per_kb",feePerKB+"");
+        if (feePerKB != -1) {
+            params.put("fee_per_kb", feePerKB + "");
         }
-        if(fee != -1){
-            params.put("fee",fee+"");
-        }
-
-
-
-
-        JsonObjectRequest req = new JsonObjectRequest(Request.Method.POST,"https://api.indiesquare.me/v2/transactions/send", new JSONObject(params),
-                new Response.Listener<JSONObject>() {
-                    @Override
-                    public void onResponse(JSONObject response) {
-
-                        ds.didCreateSendTransaction(response.toString());
-
-                    }
-                }, new Response.ErrorListener() {
-            @Override
-            public void onErrorResponse(VolleyError error) {
-                //VolleyLog.e("Error: ", error.getMessage());
-                error.printStackTrace();
-
-                NetworkResponse response = error.networkResponse;
-                if (error instanceof ServerError && response != null) {
-                    try {
-                        String res = new String(response.data,
-                                HttpHeaderParser.parseCharset(response.headers, "utf-8"));
-                        // Now you can use any deserializer to make sense of data
-
-
-                        ds.didCreateSendTransaction("error"+res);
-
-
-                    } catch (UnsupportedEncodingException e1) {
-                        // Couldn't properly decode data to string
-                        e1.printStackTrace();
-                        ds.didCreateSendTransaction("error");
-                    }
-                }else{
-                    ds.didCreateSendTransaction("error");
-                }
-
-
-            }
-
+        if (fee != -1) {
+            params.put("fee", fee + "");
         }
 
 
 
-        ){ @Override
+        final String URL =  baseUrl + "transactions/send";
 
-        public Map<String, String> getHeaders() throws AuthFailureError {
-            HashMap<String, String> headers = new HashMap<String, String>();
-            headers.put("Content-Type", "application/json; charset=utf-8");
-            if(apiKey != null){
-                headers.put("X-Api-Key",apiKey);
-            }
-            return headers;
-        }};
+        postRequest(URL,params, new CallbackObject(){
 
-        req.setRetryPolicy(new RetryPolicy() {
-            @Override
-            public int getCurrentTimeout() {
-                return 50000;
-            }
+            public void onFinished(IndieCoreError error, JSONObject result) {
 
-            @Override
-            public int getCurrentRetryCount() {
-                return 50000;
-            }
-
-            @Override
-            public void retry(VolleyError error) throws VolleyError {
-
+                callback.onFinished(error,result);
             }
         });
 
-        RequestQueue requestQueue = Volley.newRequestQueue(parent);
-        requestQueue.add(req);
+
+    }
+
+    public void createIssuance(String source, String tokenName, Double quantity, boolean divisible,final CallbackObject callback) {
+
+
+       createIssuanceMaster(source,tokenName,quantity,divisible,-1,-1,new CallbackObject(){
+
+            public void onFinished(IndieCoreError error, JSONObject result) {
+
+                callback.onFinished(error,result);
+            }
+        });
 
 
 
     }
 
-    public void issueToken(String source, String tokenName, Double quantity, boolean divisible){
-        if(loaded == false){
-            ds.didIssueToken("error: IndieCore not initialized yet");
-        }
-        sourceMaster = source;
-        tokenNameMaster = tokenName;
-        quantityMaster = quantity;
-        divisibleMaster = divisible;
-        descriptionMaster = null;
-        websiteURLMaster = null;
-        imageURLMaster = null;
-        feeMaster = -1;
-        feePerKBMaster = -1;
+    public void createIssuance(String source, String tokenName, Double quantity, boolean divisible,int fee,final CallbackObject callback) {
 
-        checkIfTokenExists(tokenName);
+
+        createIssuanceMaster(source,tokenName,quantity,divisible,fee,-1,new CallbackObject(){
+
+            public void onFinished(IndieCoreError error, JSONObject result) {
+
+                callback.onFinished(error,result);
+            }
+        });
 
 
 
     }
 
-    public void issueToken(String source, String tokenName, Double quantity, boolean divisible, String description){
-        if(loaded == false){
-            ds.didIssueToken("error: IndieCore not initialized yet");
-        }
-        sourceMaster = source;
-        tokenNameMaster = tokenName;
-        quantityMaster = quantity;
-        divisibleMaster = divisible;
-        descriptionMaster = description;
-        websiteURLMaster = null;
-        imageURLMaster = null;
-        feeMaster = -1;
-        feePerKBMaster = -1;
+    public void createIssuance(String source, String tokenName, Double quantity, boolean divisible, int fee, int feePerKB,final CallbackObject callback) {
 
-        checkIfTokenExists(tokenName);
+
+        createIssuanceMaster(source,tokenName,quantity,divisible,fee,feePerKB,new CallbackObject(){
+
+            public void onFinished(IndieCoreError error, JSONObject result) {
+
+                callback.onFinished(error,result);
+            }
+        });
 
 
 
     }
 
-    public void issueToken(String source, String tokenName, Double quantity, boolean divisible, String description, String websiteURL){
-        if(loaded == false){
-            ds.didIssueToken("error: IndieCore not initialized yet");
-        }
-        sourceMaster = source;
-        tokenNameMaster = tokenName;
-        quantityMaster = quantity;
-        divisibleMaster = divisible;
-        descriptionMaster = description;
-        websiteURLMaster = websiteURL;
-        imageURLMaster = null;
-        feeMaster = -1;
-        feePerKBMaster = -1;
-
-        checkIfTokenExists(tokenName);
 
 
-
-    }
-
-    public void issueToken(String source, String tokenName, Double quantity, boolean divisible, String description, String websiteURL, String imageURL){
-        if(loaded == false){
-            ds.didIssueToken("error: IndieCore not initialized yet");
-        }
-        sourceMaster = source;
-        tokenNameMaster = tokenName;
-        quantityMaster = quantity;
-        divisibleMaster = divisible;
-        descriptionMaster = description;
-        websiteURLMaster = websiteURL;
-        imageURLMaster = imageURL;
-        feeMaster = -1;
-        feePerKBMaster = -1;
-
-        checkIfTokenExists(tokenName);
-
-
-
-    }
-    public void issueToken(String source, String tokenName, Double quantity, boolean divisible, String description, String websiteURL, String imageURL, int fee){
-        if(loaded == false){
-            ds.didIssueToken("error: IndieCore not initialized yet");
-        }
-        sourceMaster = source;
-        tokenNameMaster = tokenName;
-        quantityMaster = quantity;
-        divisibleMaster = divisible;
-        descriptionMaster = description;
-        websiteURLMaster = websiteURL;
-        imageURLMaster = imageURL;
-        feeMaster = fee;
-        feePerKBMaster = -1;
-
-        checkIfTokenExists(tokenName);
-
-
-
-    }
-
-    public void issueToken(String source, String tokenName, Double quantity, boolean divisible, String description, String websiteURL, String imageURL, int fee, int feePerKB){
-
-        if(loaded == false){
-            ds.didIssueToken("error: IndieCore not initialized yet");
-        }
-
-        sourceMaster = source;
-        tokenNameMaster = tokenName;
-        quantityMaster = quantity;
-        divisibleMaster = divisible;
-        descriptionMaster = description;
-        websiteURLMaster = websiteURL;
-        imageURLMaster = imageURL;
-        feeMaster = fee;
-        feePerKBMaster = feePerKB;
-
-        checkIfTokenExists(tokenName);
-
-
-
-    }
-    private void createIssuanceTransaction(String source, String tokenName, Double quantity, boolean divisible, String description, int fee, int feePerKB){
+    private void createIssuanceMaster(String source, String tokenName, Double quantity, boolean divisible, int fee, int feePerKB,final CallbackObject callback) {
 
 
         // Post params to be sent to the server
         HashMap<String, String> params = new HashMap<String, String>();
         params.put("source", source);
-        if(divisible == true){
-            params.put("quantity", quantity+"");
-        }else{
-            params.put("quantity", quantity.intValue()+"");
+        if (divisible == true) {
+            params.put("quantity", quantity + "");
+        } else {
+            params.put("quantity", quantity.intValue() + "");
         }
 
         params.put("token", tokenName);
-        params.put("divisible", divisible+"");
-        if(feePerKB != -1){
-            params.put("fee_per_kb",feePerKB+"");
+        params.put("divisible", divisible + "");
+        if (feePerKB != -1) {
+            params.put("fee_per_kb", feePerKB + "");
         }
-        if(fee != -1){
-            params.put("fee",fee+"");
-        }
-        if(description != null){
-            params.put("description", description+"");
-        }
-
-        JsonObjectRequest req = new JsonObjectRequest(Request.Method.POST,"https://api.indiesquare.me/v2/transactions/issuance", new JSONObject(params),
-                new Response.Listener<JSONObject>() {
-                    @Override
-                    public void onResponse(JSONObject response) {
-
-                        ds.didIssueToken(response.toString());
-
-                    }
-                }, new Response.ErrorListener() {
-            @Override
-            public void onErrorResponse(VolleyError error) {
-                //VolleyLog.e("Error: ", error.getMessage());
-                error.printStackTrace();
-
-                NetworkResponse response = error.networkResponse;
-                if (error instanceof ServerError && response != null) {
-                    try {
-                        String res = new String(response.data,
-                                HttpHeaderParser.parseCharset(response.headers, "utf-8"));
-                        // Now you can use any deserializer to make sense of data
-
-
-                        ds.didIssueToken("error"+res);
-
-
-                    } catch (UnsupportedEncodingException e1) {
-                        // Couldn't properly decode data to string
-                        e1.printStackTrace();
-                        ds.didIssueToken("error");
-                    }
-                }else{
-                    ds.didIssueToken("error");
-                }
-
-
-            }
-
+        if (fee != -1) {
+            params.put("fee", fee + "");
         }
 
 
 
-        ){ @Override
+        final String URL = baseUrl + "transactions/issuance";
 
-        public Map<String, String> getHeaders() throws AuthFailureError {
-            HashMap<String, String> headers = new HashMap<String, String>();
-            headers.put("Content-Type", "application/json; charset=utf-8");
-            if(apiKey != null){
-                headers.put("X-Api-Key",apiKey);
-            }
-            return headers;
-        }};
+        postRequest(URL,params, new CallbackObject(){
 
-        req.setRetryPolicy(new RetryPolicy() {
-            @Override
-            public int getCurrentTimeout() {
-                return 50000;
-            }
+            public void onFinished(IndieCoreError error, JSONObject result) {
 
-            @Override
-            public int getCurrentRetryCount() {
-                return 50000;
-            }
-
-            @Override
-            public void retry(VolleyError error) throws VolleyError {
-
+                callback.onFinished(error,result);
             }
         });
 
-        RequestQueue requestQueue = Volley.newRequestQueue(parent);
-        requestQueue.add(req);
+
 
 
 
     }
-    private void createEnhancedAssetInfo(String token, String description, String websiteUrl, String imageUrl){
-
-
-        // Post params to be sent to the server
-        HashMap<String, String> params = new HashMap<String, String>();
-        params.put("description", description);
-        params.put("website", websiteUrl);
-        params.put("image", imageUrl);
-
-        JsonObjectRequest req = new JsonObjectRequest(Request.Method.POST,"https://api.indiesquare.me/v2/files/enhancedtokeninfo/"+token, new JSONObject(params),
-                new Response.Listener<JSONObject>() {
-                    @Override
-                    public void onResponse(JSONObject response) {
-
-                        Log.e("TAG","enha ok"+response.toString());
-
-                        createIssuanceTransaction(sourceMaster,tokenNameMaster,quantityMaster,divisibleMaster,descriptionMaster,feeMaster,feePerKBMaster);
-
-                    }
-                }, new Response.ErrorListener() {
-            @Override
-            public void onErrorResponse(VolleyError error) {
-                //VolleyLog.e("Error: ", error.getMessage());
-                error.printStackTrace();
-
-
-                NetworkResponse response = error.networkResponse;
-                if (error instanceof ServerError && response != null) {
-                    try {
-                        String res = new String(response.data,
-                                HttpHeaderParser.parseCharset(response.headers, "utf-8"));
-                        // Now you can use any deserializer to make sense of data
 
 
 
-                        ds.didIssueToken(res);
-
-                    } catch (UnsupportedEncodingException e1) {
-                        // Couldn't properly decode data to string
-                        e1.printStackTrace();
-                        ds.didIssueToken("error");
-                    }
-                }else{
-                    ds.didIssueToken("error");
-                }
-
-
-            }
-
+    public void createNumericTokenName(final CallbackObject callback) {
+        if(!checkCanCall(callback)){
+            return;
         }
-
-
-
-        ){ @Override
-
-        public Map<String, String> getHeaders() throws AuthFailureError {
-            HashMap<String, String> headers = new HashMap<String, String>();
-            headers.put("Content-Type", "application/json; charset=utf-8");
-            if(apiKey != null){
-                headers.put("X-Api-Key",apiKey);
-            }
-            return headers;
-        }};
-
-        req.setRetryPolicy(new RetryPolicy() {
-            @Override
-            public int getCurrentTimeout() {
-                return 50000;
-            }
-
-            @Override
-            public int getCurrentRetryCount() {
-                return 50000;
-            }
-
-            @Override
-            public void retry(VolleyError error) throws VolleyError {
-
-            }
-        });
-
-        RequestQueue requestQueue = Volley.newRequestQueue(parent);
-        requestQueue.add(req);
-
-
-
-    }
-    private void checkIfTokenExists(String token){
-
-        JsonObjectRequest req = new JsonObjectRequest(Request.Method.GET,"https://api.indiesquare.me/v2/tokens/"+token,
-                new Response.Listener<JSONObject>() {
-                    @Override
-                    public void onResponse(JSONObject response) {
-                        Log.e("TAG", "token check ok" + response.toString());
-                        ds.didIssueToken("error: token already exists");
-
-                    }
-                }, new Response.ErrorListener() {
-            @Override
-            public void onErrorResponse(VolleyError error) {
-                //VolleyLog.e("Error: ", error.getMessage());
-                error.printStackTrace();
-
-                NetworkResponse response = error.networkResponse;
-                if (error instanceof ServerError && response != null) {
-                    try {
-                        String res = new String(response.data,
-                                HttpHeaderParser.parseCharset(response.headers, "utf-8"));
-                        // Now you can use any deserializer to make sense of data
-
-
-
-                        if(descriptionMaster == null && websiteURLMaster == null && imageURLMaster == null) {
-                            createIssuanceTransaction(sourceMaster,tokenNameMaster,quantityMaster,divisibleMaster,descriptionMaster,feeMaster,feePerKBMaster);
-                        }else{
-                            createEnhancedAssetInfo(tokenNameMaster,descriptionMaster,websiteURLMaster,imageURLMaster);
-                        }
-
-
-                    } catch (UnsupportedEncodingException e1) {
-                        // Couldn't properly decode data to string
-                        e1.printStackTrace();
-                        ds.didIssueToken("error");
-                    }
-                }else{
-                    ds.didIssueToken("error");
-                }
-
-
-            }
-
-        }
-
-
-
-        ){ @Override
-
-        public Map<String, String> getHeaders() throws AuthFailureError {
-            HashMap<String, String> headers = new HashMap<String, String>();
-            headers.put("Content-Type", "application/json; charset=utf-8");
-            if(apiKey != null){
-                headers.put("X-Api-Key",apiKey);
-            }
-            return headers;
-        }};
-
-        req.setRetryPolicy(new RetryPolicy() {
-            @Override
-            public int getCurrentTimeout() {
-                return 50000;
-            }
-
-            @Override
-            public int getCurrentRetryCount() {
-                return 50000;
-            }
-
-            @Override
-            public void retry(VolleyError error) throws VolleyError {
-
-            }
-        });
-
-        RequestQueue requestQueue = Volley.newRequestQueue(parent);
-        requestQueue.add(req);
-
-
-
-    }
-    public void createNumericTokenName(){
-        if(loaded == false){
-            ds.didCreateNumericTokenName("error: IndieCore not initialized yet");
-        }
+        currentCallbackObject = callback;
         callJavaScript("createNumericTokenName");
 
     }
 
-    public void signTransaction(String tx,String passphrase,int index, String destination){
-        if(loaded == false){
-            ds.didSignTransaction("error: IndieCore not initialized yet");
+    public void signTransaction(String tx, String passphrase, int index, String destination,final CallbackObject callback) {
+        if(!checkCanCall(callback)){
+            return;
         }
-        if(apiKey != null) {
-            callJavaScript("signTransaction", passphrase, index + "", tx, destination, apiKey);
-        }
-        else{
+        currentCallbackObject = callback;
+        if (apiKey != null) {
+            callJavaScript("signTransaction", passphrase, index + "", tx, destination, apiKey,baseUrl);
+        } else {
 
         }
     }
 
-    public void signTransactionNoDest(String tx,String passphrase,int index){
-        if(loaded == false){
-            ds.didSignTransaction("error: IndieCore not initialized yet");
+    public void signTransactionNoDest(String tx, String passphrase, int index,final CallbackObject callback) {
+        if(!checkCanCall(callback)){
+            return;
         }
-        if(apiKey != null) {
-            callJavaScript("signTransactionNoDest", passphrase, index+"", tx, apiKey);
-        }else{
-
+        currentCallbackObject = callback;
+        if (apiKey != null) {
+            callJavaScript("signTransactionNoDest", passphrase, index + "", tx, apiKey,baseUrl);
         }
     }
 
-    public void createNewWallet(){
+    public void createNewWallet(final CallbackObject callback) {
 
-        if(loaded == false){
-            ds.didCreateWallet("error: IndieCore not initialized yet");
+        if(!checkCanCall(callback)){
+            return;
         }
+        currentCallbackObject = callback;
         callJavaScript("createNewPassphrase");
 
 
     }
-    public void getAddressForPassphrase(String passphrase, int index){
-        if(loaded == false){
-            ds.didGetAddress("error: IndieCore not initialized yet");
-        }
-        callJavaScript("getAddressForPassphrase",passphrase,index+"");
-    }
-    public void generateRandomDetailedWallet(){
 
-        if(loaded == false){
-            ds.didCreateDetailedWallet("error: IndieCore not initialized yet","error: IndieCore not initialized yet","error: IndieCore not initialized yet","error: IndieCore not initialized yet");
+    public void getAddressForPassphrase(String passphrase, int index,final CallbackObject callback) {
+        if(!checkCanCall(callback)){
+            return;
         }
+        currentCallbackObject = callback;
+        callJavaScript("getAddressForPassphrase", passphrase, index + "");
+    }
+
+
+
+
+    public void getRequest(String url, final CallbackArray callback) {
+        JsonArrayRequest req = new JsonArrayRequest(Request.Method.GET, url,
+                new Response.Listener<JSONArray>() {
+                    @Override
+                    public void onResponse(JSONArray response) {
+
+
+                        callback.onFinished(null, response);
+
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+
+                error.printStackTrace();
+
+                NetworkResponse response = error.networkResponse;
+                if (error instanceof ServerError && response != null) {
+                    try {
+
+
+                        String res = new String(response.data,
+                                HttpHeaderParser.parseCharset(response.headers, "utf-8"));
+                        // Now you can use any deserializer to make sense of data
+
+
+                        IndieCoreError ic = new IndieCoreError();
+                        ic.message = "error";
+                        callback.onFinished(ic, null);
+
+                    } catch (UnsupportedEncodingException e1) {
+                        // Couldn't properly decode data to string
+                        e1.printStackTrace();
+
+                        IndieCoreError ic = new IndieCoreError();
+                        ic.message = "error";
+                        callback.onFinished(ic, null);
+                    }
+                } else {
+                    IndieCoreError ic = new IndieCoreError();
+                    ic.message = "error";
+                    callback.onFinished(ic, null);
+                }
+
+
+            }
+
+        }
+
+
+        ) {
+            @Override
+
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                HashMap<String, String> headers = new HashMap<String, String>();
+                headers.put("Content-Type", "application/json; charset=utf-8");
+                if (apiKey != null) {
+                    headers.put("X-Api-Key", apiKey);
+                }
+                return headers;
+            }
+        };
+
+        req.setRetryPolicy(new RetryPolicy() {
+            @Override
+            public int getCurrentTimeout() {
+                return 50000;
+            }
+
+            @Override
+            public int getCurrentRetryCount() {
+                return 50000;
+            }
+
+            @Override
+            public void retry(VolleyError error) throws VolleyError {
+
+            }
+        });
+
+        RequestQueue requestQueue = Volley.newRequestQueue(parent);
+        requestQueue.add(req);
+
+    }
+
+    public void getRequestObject(String url, final CallbackObject callback) {
+
+        JsonObjectRequest req = new JsonObjectRequest(Request.Method.GET, url,
+                new Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+
+
+                        callback.onFinished(null, response);
+
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                //VolleyLog.e("Error: ", error.getMessage());
+                error.printStackTrace();
+
+                NetworkResponse response = error.networkResponse;
+                if (error instanceof ServerError && response != null) {
+                    try {
+
+
+                        String res = new String(response.data,
+                                HttpHeaderParser.parseCharset(response.headers, "utf-8"));
+                        // Now you can use any deserializer to make sense of data
+
+
+                        IndieCoreError ic = new IndieCoreError();
+                        ic.message = error.getMessage();
+                        callback.onFinished(ic, null);
+
+                    } catch (UnsupportedEncodingException e1) {
+                        // Couldn't properly decode data to string
+                        e1.printStackTrace();
+
+                        IndieCoreError ic = new IndieCoreError();
+                        ic.message =error.getMessage();
+                        callback.onFinished(ic, null);
+                    }
+                } else {
+                    IndieCoreError ic = new IndieCoreError();
+                    ic.message = error.getMessage();
+                    callback.onFinished(ic, null);
+                }
+
+
+            }
+
+        }
+
+
+        ) {
+            @Override
+
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                HashMap<String, String> headers = new HashMap<String, String>();
+                headers.put("Content-Type", "application/json; charset=utf-8");
+                if (apiKey != null) {
+                    headers.put("X-Api-Key", apiKey);
+                }
+                return headers;
+            }
+        };
+
+        req.setRetryPolicy(new RetryPolicy() {
+            @Override
+            public int getCurrentTimeout() {
+                return 50000;
+            }
+
+            @Override
+            public int getCurrentRetryCount() {
+                return 50000;
+            }
+
+            @Override
+            public void retry(VolleyError error) throws VolleyError {
+
+            }
+        });
+
+        RequestQueue requestQueue = Volley.newRequestQueue(parent);
+        requestQueue.add(req);
+
+    }
+
+    public void postRequest(String url, HashMap<String,String> params, final CallbackObject callback){
+
+    JsonObjectRequest req = new JsonObjectRequest(Request.Method.POST, url, new JSONObject(params),
+            new Response.Listener<JSONObject>() {
+                @Override
+                public void onResponse(JSONObject response) {
+
+
+
+                    callback.onFinished(null,response);
+                   return;
+
+                }
+            }, new Response.ErrorListener() {
+        @Override
+        public void onErrorResponse(VolleyError error) {
+          VolleyLog.e("Error: ", error.getMessage());
+            error.printStackTrace();
+
+
+            NetworkResponse response = error.networkResponse;
+            if (error instanceof ServerError && response != null) {
+                try {
+                    String res = new String(response.data,
+                            HttpHeaderParser.parseCharset(response.headers, "utf-8"));
+                    // Now you can use any deserializer to make sense of data
+
+                    IndieCoreError ic = new IndieCoreError();
+                    ic.message = res;
+                    callback.onFinished(ic,null);
+
+
+
+                } catch (UnsupportedEncodingException e1) {
+                    // Couldn't properly decode data to string
+                    e1.printStackTrace();
+                }
+            } else {
+
+                IndieCoreError ic = new IndieCoreError();
+                ic.message = error.getMessage();
+                callback.onFinished(ic,null);
+            }
+
+
+        }
+
+    }
+
+
+    ) {
+        @Override
+
+        public Map<String, String> getHeaders() throws AuthFailureError {
+            HashMap<String, String> headers = new HashMap<String, String>();
+            headers.put("Content-Type", "application/json; charset=utf-8");
+            if (apiKey != null) {
+                headers.put("X-Api-Key", apiKey);
+            }
+            return headers;
+        }
+    };
+
+        req.setRetryPolicy(new RetryPolicy() {
+            @Override
+            public int getCurrentTimeout() {
+                return 50000;
+            }
+
+            @Override
+            public int getCurrentRetryCount() {
+                return 50000;
+            }
+
+            @Override
+            public void retry(VolleyError error) throws VolleyError {
+
+            }
+        });
+
+        RequestQueue requestQueue = Volley.newRequestQueue(parent);
+        requestQueue.add(req);
+
+
+
+}
+
+    public void getTokenInfo(String token, final CallbackObject callback){
+
+        getRequestObject(baseUrl+"tokens/"+token, new CallbackObject(){
+
+            public void onFinished(IndieCoreError error, JSONObject result) {
+
+                callback.onFinished(error,result);
+            }
+        });
+
+
+    }
+
+    public void getTokenHistory(String token, final CallbackArray callback){
+
+        getRequest(baseUrl+"tokens/"+token+"/history", new CallbackArray(){
+
+            public void onFinished(IndieCoreError error, JSONArray result) {
+
+                callback.onFinished(error,result);
+            }
+        });
+
+
+    }
+
+    public void getTokenHolders(String token, final CallbackArray callback){
+
+        getRequest(baseUrl+"tokens/"+token+"/holders", new CallbackArray(){
+
+            public void onFinished(IndieCoreError error, JSONArray result) {
+
+                callback.onFinished(error,result);
+            }
+        });
+
+
+    }
+
+    public void getTokenDescription(String token, final CallbackObject callback){
+
+        getTokenInfo(token, new CallbackObject(){
+
+            public void onFinished(IndieCoreError error, JSONObject result) {
+                if(error != null){
+                    callback.onFinished(error,result);
+                    return;
+                }
+
+                try{
+
+                    if(result.getString("description") != null){
+                    String description = result.getString("description");
+                        boolean isValid = URLUtil.isValidUrl( description );
+                        if(isValid){
+
+                            getRequestObject(description, new CallbackObject(){
+
+                                public void onFinished(IndieCoreError error, JSONObject result) {
+
+                                    callback.onFinished(error,result);
+                                    return;
+
+                                }
+                            });
+
+
+
+
+                        }else{
+                            JSONObject res = new JSONObject();
+                            try {
+                                res.put("description",description);
+                                callback.onFinished(null,res);
+                                return;
+                            } catch (JSONException e) {
+
+                                // TODO Auto-generated catch block
+                                e.printStackTrace();
+                                IndieCoreError ic = new IndieCoreError();
+                                ic.message = "error returning description";
+                                callback.onFinished(ic,null);
+                                return;
+                            }
+                        }
+
+
+                    }
+
+                }
+                catch (JSONException e){
+                    IndieCoreError ic = new IndieCoreError();
+                    ic.message = "error json exception";
+                    callback.onFinished(ic,null);
+                    return;
+                }
+
+            }
+        });
+
+
+
+    }
+
+
+    public void getHistory(String source, final CallbackArray callback){
+
+        getRequest(baseUrl+"addresses/"+source+"/history", new CallbackArray(){
+
+            public void onFinished(IndieCoreError error, JSONArray result) {
+
+                callback.onFinished(error,result);
+            }
+        });
+
+
+    }
+
+    public void getBalances(String source, final CallbackArray callback){
+
+        getRequest(baseUrl+"addresses/"+source+"/balances", new CallbackArray(){
+
+            public void onFinished(IndieCoreError error, JSONArray result) {
+
+                callback.onFinished(error,result);
+            }
+        });
+
+
+    }
+    public void generateRandomDetailedWallet(final CallbackObject callback){
+        if(!checkCanCall(callback)){
+            return;
+        }
+        currentCallbackObject = callback;
         callJavaScript("createRandomDetailedWallet");
 
 
     }
-    public void checkIfAddressIsValid(String address){
-        if(loaded == false){
-            ds.didCheckAddress(false);
+    public void checkIfAddressIsValid(String address,final CallbackObject callback){
+        if(!checkCanCall(callback)){
+            return;
         }
-       // webview.loadUrl("javascript:isValidBitcoinAddress('"+address+"')");
+        currentCallbackObject = callback;
         callJavaScript("isValidBitcoinAddress",address);
+    }
+
+    public void signMessage(String message, String passphrase, int index, final CallbackObject callback){
+        if(!checkCanCall(callback)){
+            return;
+        }
+        currentCallbackObject = callback;
+        callJavaScript("signMessage",message,passphrase,index+"");
+    }
+
+    public void verifyMessage(String message,String signature,String address,final CallbackObject callback){
+        if(!checkCanCall(callback)){
+            return;
+        }
+        currentCallbackObject = callback;
+        callJavaScript("verifyMessage",message,signature,address);
+    }
+
+    public boolean checkCanCall(CallbackObject callback){
+        if(currentCallbackObject != null){
+            IndieCoreError ic = new IndieCoreError();
+            ic.message = "last callback not finished";
+            callback.onFinished(ic,null);
+            return false;
+        }
+        if(loaded == false){
+            IndieCoreError ic = new IndieCoreError();
+            ic.message = "IndieCore not initialized yet";
+            callback.onFinished(ic,null);
+            return false;
+        }
+        return true;
     }
 
     private void callJavaScript(String methodName, Object...params){
@@ -979,7 +933,7 @@ public class IndieCore {
         }
 
         stringBuilder.append(")}catch(error){AndroidFunction.onError(error.message);}");
-        //Log.e("TAG","string:"+stringBuilder.toString());
+
         webview.loadUrl(stringBuilder.toString());
     }
 
@@ -990,40 +944,152 @@ public class IndieCore {
             mContext = c;
         }
         @JavascriptInterface public void didSignTransaction(String response) {
-            ds.didSignTransaction(response);
+            JSONObject res = new JSONObject();
+            try {
+                res.put("tx",response);
+
+            } catch (JSONException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+
+
+            currentCallbackObject.onFinished(null,res);
+            currentCallbackObject = null;
+            return;
 
         }
         @JavascriptInterface public void didCreateNumericTokenName(String tokenName) {
-            ds.didCreateNumericTokenName(tokenName);
+            JSONObject res = new JSONObject();
+            try {
+                res.put("result",tokenName);
+
+            } catch (JSONException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+
+
+            currentCallbackObject.onFinished(null,res);
+            currentCallbackObject = null;
+            return;
 
         }
         @JavascriptInterface public void addressChecked(String result) {
-            if(result.equals("true")) {
-                ds.didCheckAddress(true);
+            JSONObject res = new JSONObject();
+            try {
+                res.put("result",result);
+
+            } catch (JSONException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
             }
-            else{
-                ds.didCheckAddress(false);
-            }
+
+
+            currentCallbackObject.onFinished(null,res);
+            currentCallbackObject = null;
+            return;
 
         }
 
         @JavascriptInterface public void passphraseCreated(String msg) {
-            ds.didCreateWallet(msg);
+
+            JSONObject res = new JSONObject();
+            try {
+                res.put("passphrase",msg);
+
+            } catch (JSONException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+
+
+            currentCallbackObject.onFinished(null,res);
+            currentCallbackObject = null;
+            return;
+
 
         }
 
         @JavascriptInterface public void detailedWalletCreated(String privateKey,String wif,String address,String publicKey) {
-            ds.didCreateDetailedWallet(privateKey,wif,address,publicKey);
+
+            JSONObject res = new JSONObject();
+            try {
+                res.put("private_key",privateKey);
+                res.put("wif",wif);
+                res.put("address",address);
+                res.put("public_key",publicKey);
+            } catch (JSONException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+
+
+            currentCallbackObject.onFinished(null,res);
+            currentCallbackObject = null;
+            return;
+
 
         }
 
         @JavascriptInterface public void getAddressForPassphrase(String address){
-            ds.didGetAddress(address);
+            JSONObject res = new JSONObject();
+            try {
+                res.put("address",address);
+
+            } catch (JSONException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+
+
+            currentCallbackObject.onFinished(null,res);
+            currentCallbackObject = null;
+            return;
+
         }
+
+        @JavascriptInterface public void didVerifyMessage(String result){
+            JSONObject res = new JSONObject();
+            try {
+                res.put("result",result);
+
+            } catch (JSONException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+
+
+            currentCallbackObject.onFinished(null,res);
+            currentCallbackObject = null;
+            return;
+
+        }
+        @JavascriptInterface public void didSignMessage(String sig){
+            JSONObject res = new JSONObject();
+            try {
+                res.put("result",sig);
+
+            } catch (JSONException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+
+
+            currentCallbackObject.onFinished(null,res);
+            currentCallbackObject = null;
+            return;
+
+        }
+
 
         @JavascriptInterface public void onError(String msg){
 
-            Log.e("tag","error: "+msg);
+            IndieCoreError ic = new IndieCoreError();
+            ic.message = msg;
+            currentCallbackObject.onFinished(ic, null);
+            currentCallbackObject = null;
+            return;
         }
 
 
@@ -1032,5 +1098,7 @@ public class IndieCore {
 
 
     }
+
+
 
 }
