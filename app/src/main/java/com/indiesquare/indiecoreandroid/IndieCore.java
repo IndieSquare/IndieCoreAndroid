@@ -2,7 +2,10 @@ package com.indiesquare.indiecoreandroid;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.URLUtil;
 import android.webkit.WebView;
@@ -20,6 +23,7 @@ import com.android.volley.VolleyLog;
 import com.android.volley.toolbox.HttpHeaderParser;
 import com.android.volley.toolbox.JsonArrayRequest;
 import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 
 import org.json.JSONArray;
@@ -29,9 +33,10 @@ import org.json.JSONObject;
 import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 
-public class IndieCore {
+public class IndieCore{
 
 
     //define callback interface
@@ -56,6 +61,7 @@ public class IndieCore {
     Activity parent;
     public String apiKey;
 
+    String base = "https://indiesquare.me";
     String baseUrl = "https://api.indiesquare.me/v2/";
 
 
@@ -735,6 +741,279 @@ public class IndieCore {
 
 
 }
+/*
+-(void)signTransactionWithWallet:(NSString*)myUrlScheme andTx:(NSString *)unsignedTx andCompletion:(completionBlock)completionBlock{
+
+    NSString* channel = [NSString stringWithFormat:@"indie-%@",[[NSProcessInfo processInfo] globallyUniqueString]];
+
+    [self pubsub:channel andParams:[NSDictionary dictionaryWithObjectsAndKeys:@"sign",@"request",unsignedTx,@"unsigned_hex", nil] andUrlScheme:myUrlScheme andCompletion:^(NSError *error, NSDictionary *response) {
+
+        completionBlock(error,response);
+
+    }];
+}
+ */
+    public void signTransactionWithWallet(String myUrlScheme, String unsignedTx, final CallbackObject callback){
+        String channel = "indie-" + UUID.randomUUID().toString();
+
+
+        HashMap<String, String> params = new HashMap<String, String>();
+        params .put("request", "sign");
+        params .put("unsigned_hex", unsignedTx);
+
+        pubsub(channel,params, myUrlScheme, new CallbackObject(){
+
+            public void onFinished(IndieCoreError error, JSONObject result) {
+
+                callback.onFinished(error,result);
+            }
+
+        });
+
+
+    }
+
+    public void getAddressFromWallet(String myUrlScheme, final CallbackObject callback){
+        final String channel = "indie-" + UUID.randomUUID().toString();
+
+
+        HashMap<String, String> params = new HashMap<String, String>();
+        params .put("request", "getaddress");
+
+
+        pubsub(channel,params, myUrlScheme, new CallbackObject(){
+
+            public void onFinished(IndieCoreError error, JSONObject result) {
+
+                try {
+                    if(result == null){
+                        IndieCoreError ic = new IndieCoreError();
+                        ic.message = "JSON Error";
+                        callback.onFinished(ic,null);
+                        return;
+                    }
+                    final JSONObject res = new JSONObject(result.getString("response"));
+                    JSONObject data = res.getJSONObject("data");
+                    final String address = data.getString("address");
+                    String signature= data.getString("signature");
+
+                        verifyMessage(channel,signature,address, new CallbackObject() {
+
+                                    public void onFinished(IndieCoreError error, JSONObject result) {
+
+                                         if(error != null){
+                                              callback.onFinished(error,result);
+                                             return;
+                                         }
+                                        try {
+                                        if(result.getString("result").equals("true")){
+                                            JSONObject res = new JSONObject();
+                                            res.put("address",address);
+                                            callback.onFinished(error,res);
+                                        }
+                                        }
+                                        catch (JSONException e){
+                                            IndieCoreError ic = new IndieCoreError();
+                                            ic.message = "JSON Error";
+                                            callback.onFinished(ic,null);
+                                        }
+
+                                    }
+                                });
+
+
+
+                }
+                catch (JSONException e){
+                    IndieCoreError ic = new IndieCoreError();
+                    ic.message = "JSON Error";
+                    callback.onFinished(ic,null);
+                }
+
+
+            }
+
+        });
+
+
+    }
+
+    public void linkageWallet( HashMap<String,String> params, String channel, String MyUrlScheme){
+        String request = params.get("request");
+        String nonce = UUID.randomUUID().toString();
+
+        HashMap<String, String> newParams = new HashMap<String, String>();
+        newParams.put("channel", channel);
+        newParams.put("nonce", nonce);
+        newParams.put("x-success", MyUrlScheme);
+
+        if(request.equals("sign")){
+            newParams.put("unsigned_hex",params.get("unsigned_hex"));
+        }
+
+        JSONObject json = new JSONObject(newParams);
+       try{
+           String jsonString = json.toString(2);
+
+           String urlParams = request+"?params="+jsonString;
+
+           if(request.equals("getaddress") || request.equals("verifyuser")) {
+
+              String xcallback_params = "channel="+channel+"&nonce="+nonce+"&x-success="+MyUrlScheme+"&msg="+channel;
+               urlParams = "x-callback-url/"+request+"?"+xcallback_params;
+           }
+
+
+           PackageManager manager = parent.getPackageManager();
+
+           Intent i = manager.getLaunchIntentForPackage("inc.lireneosoft.counterparty");
+           Log.e("urlparams: ", urlParams);
+               i.putExtra("source",  urlParams);
+               i.addCategory(Intent.CATEGORY_LAUNCHER);
+           parent.startActivity(i);
+
+
+       }
+       catch (JSONException e){
+
+       }
+
+
+    }
+    public void pubsub(final String channel,  final HashMap<String,String> params, final String urlScheme, final CallbackObject callback){
+        HashMap<String, String> paramsNew = new HashMap<String, String>();
+       paramsNew.put("channel", channel);
+
+         String URL = base + "/pubsub/topic";
+
+        postRequestXML(URL, paramsNew, new CallbackObject(){
+
+            public void onFinished(IndieCoreError error, JSONObject result) {
+
+                if(error != null) {
+                    callback.onFinished(error, result);
+                }
+
+                linkageWallet(params,channel,urlScheme);
+
+                HashMap<String, String> paramsNew = new HashMap<String, String>();
+                paramsNew.put("channel", channel);
+                paramsNew.put("type", "1");
+                String URL = base + "/pubsub/subscribe";
+                postRequestXML(URL, paramsNew, new CallbackObject() {
+
+                    public void onFinished(IndieCoreError error, JSONObject result) {
+
+                        callback.onFinished(error, result);
+
+                    }
+
+                });
+
+
+
+            }
+        });
+    }
+
+    public void postRequestXML(String url, final HashMap<String,String> params, final CallbackObject callback){
+
+        StringRequest req = new StringRequest(Request.Method.POST, url,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+
+                        JSONObject res = new JSONObject();
+                        try {
+                            res.put("response",response);
+
+                        } catch (JSONException e) {
+                            // TODO Auto-generated catch block
+                            e.printStackTrace();
+                        }
+
+
+                        callback.onFinished(null,res);
+                        return;
+
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                VolleyLog.e("Error: ", error.getMessage());
+                error.printStackTrace();
+
+
+                NetworkResponse response = error.networkResponse;
+                if (error instanceof ServerError && response != null) {
+                    try {
+                        String res = new String(response.data,
+                                HttpHeaderParser.parseCharset(response.headers, "utf-8"));
+                        // Now you can use any deserializer to make sense of data
+
+                        IndieCoreError ic = new IndieCoreError();
+                        ic.message = res;
+                        callback.onFinished(ic,null);
+
+
+
+                    } catch (UnsupportedEncodingException e1) {
+                        // Couldn't properly decode data to string
+                        e1.printStackTrace();
+                    }
+                } else {
+
+                    IndieCoreError ic = new IndieCoreError();
+                    ic.message = error.getMessage();
+                    callback.onFinished(ic,null);
+                }
+
+
+            }
+
+        }
+
+
+        ) {
+            @Override
+
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                HashMap<String, String> headers = new HashMap<String, String>();
+                headers.put("Content-Type", "application/x-www-form-urlencoded; charset=utf-8");
+
+                return headers;
+            }
+            @Override
+            protected Map<String,String> getParams(){
+
+
+                return params;
+            }
+        };
+
+        req.setRetryPolicy(new RetryPolicy() {
+            @Override
+            public int getCurrentTimeout() {
+                return 50000;
+            }
+
+            @Override
+            public int getCurrentRetryCount() {
+                return 50000;
+            }
+
+            @Override
+            public void retry(VolleyError error) throws VolleyError {
+
+            }
+        });
+
+        RequestQueue requestQueue = Volley.newRequestQueue(parent);
+        requestQueue.add(req);
+
+
+
+    }
 
     public void getTokenInfo(String token, final CallbackObject callback){
 

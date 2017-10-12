@@ -300,6 +300,40 @@ public class MainActivity extends AppCompatActivity {
 
 
     }
+
+    public void signTransactionWithWallet(View view) {
+
+        String unsignedTx = "0100000001425fc12873a1a09c744ce7e782e95acc5cb69611d9f9b69550a45576383338f7020000001976a914edee861dff4de166683e4c54ae3869cd05c7ae0f88acffffffff0336150000000000001976a9141485d9d03b41aaa9dca7d70d7f63ff4a0826100e88ac00000000000000001e6a1cacd10644550a44ead1ce07effa7abcdd01911e197349b796338f1fe0b0561400000000001976a914edee861dff4de166683e4c54ae3869cd05c7ae0f88ac00000000";
+        ic.signTransactionWithWallet("MYURLSCHEME://link",unsignedTx, new IndieCore.CallbackObject() {
+            @Override
+            public void onFinished(IndieCoreError error, JSONObject result) {
+                if (error != null) {
+                    Log.i("TAG", "error" + error.message);
+                } else {
+                    Log.i("TAG", "sig " + result);
+                }
+            }
+        });
+
+
+
+    }
+
+    public void getAddressFromWallet(View view) {
+
+        ic.getAddressFromWallet("MYURLSCHEME://link", new IndieCore.CallbackObject() {
+            @Override
+            public void onFinished(IndieCoreError error, JSONObject result) {
+                if (error != null) {
+                    Log.i("TAG", "error" + error.message);
+                } else {
+                    Log.i("TAG", "address  " + result);
+                }
+            }
+        });
+
+    }
+
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
@@ -355,6 +389,24 @@ public class MainActivity extends AppCompatActivity {
         });
 
     }
+
+    public void broadcast(View view) {
+
+        String signedtx="0100000001bf1f87c5041063d8353f3d8e109fb11405456d7972c5f401308ced36eb9e8fea010000001976a914e1869fa1cec7741a502e7a5bd938ed8f5e354b5488acffffffff0200000000000000002e6a2c0b0b8cb664864cdf2ff70668595e63567b9d8ece36b2383513b6eeab7f1c15e70466593f13bb49618b8afe7079e93a00000000001976a914e1869fa1cec7741a502e7a5bd938ed8f5e354b5488ac00000000\"}' https://api.indiesquare.me/v2/transactions/broadcast";
+    ic.broadcast(signedtx, new IndieCore.CallbackObject() {
+            @Override
+            public void onFinished(IndieCoreError error, JSONObject result) {
+                if (error != null) {
+                    Log.i("TAG", "error" + error.message);
+                } else {
+                    Log.i("TAG", "tx  " + result);
+                }
+            }
+        });
+
+    }
+
+
 
 
 
