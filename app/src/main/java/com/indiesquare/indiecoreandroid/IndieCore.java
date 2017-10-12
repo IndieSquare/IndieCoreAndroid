@@ -867,7 +867,7 @@ public class IndieCore{
            PackageManager manager = parent.getPackageManager();
 
            Intent i = manager.getLaunchIntentForPackage("inc.lireneosoft.counterparty");
-           Log.e("urlparams: ", urlParams);
+          
                i.putExtra("source",  urlParams);
                i.addCategory(Intent.CATEGORY_LAUNCHER);
            parent.startActivity(i);

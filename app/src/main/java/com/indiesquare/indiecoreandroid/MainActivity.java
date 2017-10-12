@@ -1,8 +1,6 @@
 package com.indiesquare.indiecoreandroid;
 
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.net.Uri;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -10,8 +8,6 @@ import android.view.View;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
-
-import java.util.UUID;
 
 public class MainActivity extends AppCompatActivity {
     private String randomMessage;
@@ -339,6 +335,7 @@ public class MainActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
     }
+    /*
     public void linkIndiesquare(View view) {
 
         randomMessage = UUID.randomUUID().toString();
@@ -358,7 +355,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-    }
+    }*/
 
     public void verifyMessage(View view) {
 
@@ -408,41 +405,5 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-
-
-    @Override
-    public void onResume() {
-        super.onResume();
-
-
-        Uri theUri = getIntent().getData();
-
-
-        if (theUri != null) {
-
-            String theURI = theUri.toString();
-
-
-            String theAddress = theURI.substring(theURI.indexOf("?address=") + 9, theURI.indexOf("&msg="));
-
-
-            String theSig = theURI.substring(theURI.indexOf("&sig=") + 5, theURI.length());
-
-
-            ic.verifyMessage(  randomMessage,theSig,theAddress, new IndieCore.CallbackObject() {
-                @Override
-                public void onFinished(IndieCoreError error, JSONObject result) {
-                    if (error != null) {
-                        Log.i("TAG", "error" + error.message);
-                    } else {
-                        Log.i("TAG", "verify  " + result);
-                    }
-                }
-            });
-
-
-        }
-
-    }
 
 }
