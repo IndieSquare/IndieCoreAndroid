@@ -45,7 +45,7 @@ Create a send transaction
         });
  ```
 Sign transaction with users installed IndieSquare Wallet
-You must add your apps urlscheme (represented by MYURLSCHEME) in your plist, so IndieSquare and return to your app after users authorizes the signature.
+You must add your apps urlscheme (represented by MYURLSCHEME) in your manifest file, so IndieSquare can return to your app after the user authorizes the signature.
 
  ```  
   ic.signTransactionWithWallet("MYURLSCHEME",unsignedTx, new IndieCore.CallbackObject() {
@@ -78,7 +78,7 @@ Broadcast signed transaction
  
 ## Request user's IndieSquare wallet address and verify user owns address through message signature
 
-You must add your apps urlscheme (represented by MYURLSCHEME) in your plist, so IndieSquare and return to your app after users authorizes address usage.
+You must add your apps urlscheme (represented by MYURLSCHEME) in your plist, so IndieSquare can return to your app after users authorizes address usage.
 
 ```
   ic.getAddressFromWallet("MYURLSCHEME", new IndieCore.CallbackObject() {

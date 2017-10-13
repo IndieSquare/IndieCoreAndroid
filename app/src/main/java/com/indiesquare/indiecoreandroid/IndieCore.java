@@ -5,7 +5,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
-import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.URLUtil;
 import android.webkit.WebView;
@@ -867,7 +866,7 @@ public class IndieCore{
            PackageManager manager = parent.getPackageManager();
 
            Intent i = manager.getLaunchIntentForPackage("inc.lireneosoft.counterparty");
-          
+
                i.putExtra("source",  urlParams);
                i.addCategory(Intent.CATEGORY_LAUNCHER);
            parent.startActivity(i);
